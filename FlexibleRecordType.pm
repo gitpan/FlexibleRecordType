@@ -4,12 +4,12 @@ package FlexibleRecordType;
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl itself.
 
+$VERSION = '0.2';
 
 use strict;
 use Data::Dumper;
 use FlexibleRecordInstance;
 
-$VERSION = '0.1';
 
 ################################################################################
 
@@ -39,17 +39,22 @@ sub New
 sub Instance
 ################################################################################
 {
-
+	print "INSIDE INSTANCE\n";
 	my $record_type=shift(@_);
 
-	
-	my $record_instance = [ $record_type ]; 
-	bless ($record_instance, 'FlexibleRecordInstance' );
+	# the next thing in the @_ array are hashes to be tied.
+ 	for(my $i=0; $i<scalar(@_); $i=$i+1)
+		{
+		print "tying $_[$i] \n";
+		tie %{$_[$i]}, 'FlexibleRecordInstance', $record_type;
+		$record_type->remember_this_instance($_[$i]);
+		}
+
 
 	# do any object initialization here
-	$record_type->remember_this_instance($record_instance);
 
-	return $record_instance;
+	print "AAA\n";
+
 }
 
 
@@ -96,6 +101,7 @@ sub DeleteElement
 ################################################################################
 {
 	my $rec_typ_obj=shift(@_);
+print "inside DeleteElement\n";
 
 	my @element_array = keys(%$rec_typ_obj);
 
@@ -103,6 +109,7 @@ sub DeleteElement
 	while (@_)
 		{
 		my $element_name = shift(@_);
+	print "deleting $element_name\n";
 		unless(exists($rec_typ_obj->{$element_name}))
 			{
 			warn "element to delete does not exist, \"$element_name\"";
@@ -143,11 +150,12 @@ sub DeleteElement
 		######################################################
 		# now go through all instances of this object
 		# and delete these elements from object array
-		my $instance_arr_ref = $rec_typ_obj->{$instance_list_key};
-
-		foreach my $inst (@$instance_arr_ref)
+		my $instance_ref = $rec_typ_obj->{$instance_list_key};
+		my $tied_arr;
+		foreach my $inst (@$instance_ref)
 			{
-			splice(@$inst, $index, 1);
+			$tied_arr = tied($inst);
+			splice(@$tied_arr, $index, 1);
 			}
 		}
 
@@ -174,6 +182,7 @@ sub remember_this_instance
 ################################################################################
 {
 	my ($rec_typ_obj, $record_instance)=@_;
+	print "remembering instance  ($rec_typ_obj, $record_instance)\n";
 	push(@{$rec_typ_obj->{$instance_list_key}}, $record_instance);
 
 }
@@ -183,6 +192,8 @@ sub forget_this_instance
 ################################################################################
 {
 	my ($rec_typ_obj, $record_instance)=@_;
+	print "\n\n\nforgetting $record_instance \n";
+	$rec_typ_obj->dump_list;
 	for (my $i=0; 
 		$i<scalar(@{$rec_typ_obj->{$instance_list_key}}); 
 		$i=$i+1
@@ -191,15 +202,28 @@ sub forget_this_instance
 		if($record_instance == $rec_typ_obj->{$instance_list_key}->[$i])
 			{
 			splice(@{$rec_typ_obj->{$instance_list_key}}, $i, 1);
+			print "second dump\n";
+			$rec_typ_obj->dump_list;
 			return;
 			}
 		}
 
-	warn "could not find record instance $record_instance in master list";
+	#warn "could not find record instance $record_instance in master list";
 }
 
 
+sub dump_list 
+{
+	my ($rec_typ_obj)=@_;
+	print "start dump list \n";
+	foreach my $item (@{$rec_typ_obj->{$instance_list_key}})
+		{
+		next unless(defined($item));
+		print "list contains $item \n";
+		}
+	print "end dump list \n\n";
 
+}
 ################################################################################
 ################################################################################
 

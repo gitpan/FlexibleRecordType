@@ -1,194 +1,61 @@
-This package, FlexibleRecordType, defines a class of object
-that behaves similar to a Record type.  A record type describes
-a record and defines its elements. 
 
-For example, you might use a record to describe a mailing label
-with the elements 'Name', 'State', and 'ZIP'. 
+this class allow you to create a record type, 
+and then create instances of that record.
 
-	my $mailing_label = New FlexibleRecordType('Name', 'State', 'ZIP');
+why?
 
-This creates an object type and defines its element names,
-it does not create an instance of the record itself.
-Once a record type is created and defined, instances of this
-type can be made.
+because records look like hashes, using descriptive strings as
+keys to get/put data.  But instances of the record type are
+implemented using arrays to save memory.
 
-	my $home_address = $mailing_label->Instance;
+# declare what a record will look like for a mailing label.
+ my $mailing_label = New FlexibleRecordType('Name', 'State', 'ZIP');
 
-This creates a record with three elements 'Name', 'State', and 'ZIP',
-which are initially undefined.
+# create instances of the record type
 
-This instance can then have values assigned to its elements.
+ my %home_address;
+ $mailing_label->Instance(\%home_address);
+ $home_address{'Name'} = 'Greg';
+ $home_address{'State'} = 'XI';
+ $home_address{'ZIP'} = '12345';
 
-	$home_address->Value('State','XI');
-	$home_address->Value('ZIP','12345');
-	$home_address->Value('Name','Greg');
+ my %work_address;
+ $mailing_label->Instance(\%work_address);
+ $work_address{'Name'} = 'Mr. London';
+ $work_address{'State'} = 'QA';
+ $work_address{'ZIP'} = '33333';
 
-The value of an element can be retrieved.
+ my %play_address;
+ $mailing_label->Instance(\%play_address);
+ $play_address{'Name'} = 'Chopper';
+ $play_address{'State'} = 'DO';
+ $play_address{'ZIP'} = '98765';
 
-	my $current_state = $home_address->Value('State');
+the mailing label object defines the type, defining what the
+hash elements are.  home_address, work_address, and play_address
+are all instances of the mailing label type.
 
-Multiple instances of the same type can be created and initialized.
+the three instances look and behave like hashes, but underneath,
+they are actually implemented using arrays.
 
- my $work_address = $mailing_label->Instance;
-    $work_address->Value('Name','Mr London');
+version 0_1 of this module used simple classes and methods to 
+implement the behaviours. this version is the first attempt to
+implement the concept using a tied hash.  
 
- my $play_address = $mailing_label->Instance;
-    $play_address->Value('Name','Chopper Head');
+underneath the hood, the type object keeps a hash to translate
+keys into array indexes for the instances. It also keeps an 
+array which stores all instances of the record type.
+this allows for the record type to delete a key completely.
+i.e. the type object goes through all instances of the 
+type and 'unsplices' that index from the array. thus removing
+it from existence as if it were a normal hash.
 
-In all, the class behaves as a typical record in this regard.
+this class was created as a way to improve pseudo-hashes,
+which attempts to implement hash like behaviour with array like
+memory efficiency. 
 
-################################################################################
+consider it more a proof of concept class than an actual 
+implementation package.
 
-So, the question begs, "Why does this class exist?"
-
-This class was written in response to the desire to have 
-a data type that behaves like a hash, but is efficient like an array.
-
-Hashes have text strings as keys to get and put data values.
-	$hash{'mykey'} = 'my_value';
-
-Hashes are not restricted to numeric indexes like arrays are.
-Hashes can use descriptive keys to indicate what is stored at
-that key index. Hashes can delete a key/value pair, and not 
-affect the other key/values in the hash. They are order independent.
-
-The problem is that hashes are inefficient with storage, and 
-take up a lot of space.
-
-Arrays, on the other hand, are much more efficient than hashes.
-However, you have to use numeric indexes to store your data,
-and remember what the numbers correspond to.
-
-	$array[0] = 'my_value'; # remember 0 means 'mykey' from now on
-
-Another problem with arrays is that once you assign a numeric index
-to a particular meaning, you cannot delete that index without
-messing up all the other indexes.
-
-This class was created to try and mix the best of both worlds.
-
-
-The FlexibleRecordType uses a hash to remember key names.
-Therefore, descriptive keys can be used to get and put data
-into an instance of a record.  But there is only one hash
-per type. All instances of a type store their data in an array
-format. The classes talk to one another to translate the 
-hash key in the record type into a numeric index for all
-instances.
-
-i.e. the record type might have a hash with the following key/value pairs:
-	{
-	'Name'=> 1,
-	'State' => 2,
-	'ZIP' => 3
-	}
-
-a record instance might contain an array that looks like this:
-	[
-	\$type_reference,
-	'Greg',
-	'XI',
-	12345
-	]
-
-To get or set data in a record instance, the key is translated into
-an numeric index. 'Name' might be translated into 1. This numeric
-instance is then used to index into the array for the instance in
-question.
-
-################################################################################
-
-Another solution to the hash/array tradeoffs between memory and 
-descriptive indexes is the "pseudo hash".  The pseudo hash has 
-the problem that it does not behave like a real hash in one 
-very distinct way: you cannot delete a key/index once you've
-created it.  
-
-A pseudo hash uses an array to store data, like a FlexibleRecordInstance,
-however, the pseudo hash fixes the key string to a constant index,
-therefore you can not delete a key/index without reording the 
-entire array and messing up the other data.
-
-FlexibleRecordType uses a hash to retain the relationship between
-hash key string and array index in a redefinable way. You can delete
-an element (key/index) in a FlexibleRecordType, and the class will
-reorder all instances of that type, and reconfigure the type to
-reflect the new array indexing.
-
-A flexible record can delete an element in the type.
-
-This can be accomplished through an instance of the record type.
-	$home_address->DeleteElement('State');
-
-It can also be accomplished through the record type itself.
-	$mailing_label->DeleteElement('State');
-
-Regardless of how it is accomplished, all instances of the
-record type are modified so that the index in the array instance
-corresponding to the 'State' element is deleted. The hash used
-by the record type is then reordered so that the key/data pairs
-reflect the new array indexing for the type.
-
-This is all handled internally by the class by calling the 
-DeleteElement method on a record instance or record type.
-
-How is this done?
-
-the record type object stores a reference to all instances of the
-record type. When an element is deleted, the record type object
-goes through the list of all instances and deletes the array index.
-
-################################################################################
-
-tradeoffs:
-
-The flexible record type class is used in conjunction with the flexible 
-record instance class. For a single instance, a hash with all the keys,
-and an array of similar size is created.  Also, because the class must 
-store all instances of the object, a second array must be maintained by 
-the class. For a single record instance, this is actually worse memory
-utilization than just using a plain hash.
-
-advantages:
-
-When you have multiple instances of the same type. The more the number
-of instances, the better your memory is used efficiently, since only one
-hash is used per type. As more instances are created, the memory utilization
-approaches that of a plain array. It will never equal it, but it gets
-closer for more and more instances.
-
-disadvantages:
-
-The main tradeoff for using this class is speed. Although more instances
-make the memory usage more efficient, it makes deleting an element that
-much slower. The more instances that must be adjusted, the longer it will
-take to delete an element name from a record type. Also, deleting an
-instance reference from the master list of all instances of the record type
-requires the code to loop through the entire array of instances. Therefore
-deleting an instance when a lot of instances exist would also be slower.
-
-So, when do you use this record type class?
-
-When you know you will have many instances of the same record,
-and when you know that the record type will not be redefined often
-(i.e. you wont be adding or deleting element names too often)
-that would be the ideal situation for using this class.
-
-################################################################################
-
-improvements:
-
-the biggest improvement I can think of to this class is to have an instance
-delete its reference in the master list when the instance is destroyed.
-Currently, instances must be specifically deleted from the master list
-before they go out of scope. else you get a memory leak.
-
-Before a scalar holding a record instance is about to go out of scope,
-it must be explicitely removed from the master list of all instances.
-
-	$work_address->DeleteInstance;
-
-A future version of this package would tie the scalar to do this 
-automatically when the scalar is DESTROYed.
-
+Greg
 
